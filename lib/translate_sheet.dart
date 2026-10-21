@@ -117,9 +117,13 @@ class _TranslateSheetState extends State<TranslateSheet> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final tt = Theme.of(context).textTheme;
+    final mq = MediaQuery.of(context);
+    // Keyboard terbuka -> pakai tinggi keyboard; kalau tidak -> tinggi nav bar.
+    final bottom = mq.viewInsets.bottom > 0
+        ? mq.viewInsets.bottom
+        : mq.viewPadding.bottom;
     return Padding(
-      padding: EdgeInsets.fromLTRB(
-          20, 0, 20, MediaQuery.of(context).viewInsets.bottom + 20),
+      padding: EdgeInsets.fromLTRB(20, 0, 20, bottom + 20),
       child: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,

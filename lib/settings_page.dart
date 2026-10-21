@@ -37,7 +37,7 @@ Future<void> showAbout(BuildContext context) {
   );
 }
 
-class SettingsPage extends StatelessWidget {
+class SettingsPage extends StatefulWidget {
   final AppSettings settings;
   final Future<void> Function() onClearCache;
   final Future<void> Function() onClearData;
@@ -48,6 +48,37 @@ class SettingsPage extends StatelessWidget {
     required this.onClearCache,
     required this.onClearData,
   });
+
+  @override
+  State<SettingsPage> createState() => _SettingsPageState();
+}
+
+class _SettingsPageState extends State<SettingsPage> {
+  AppSettings get settings => widget.settings;
+  Future<void> Function() get onClearCache => widget.onClearCache;
+  Future<void> Function() get onClearData => widget.onClearData;
+  String _folder = '…';
+
+  @override
+  void initState() {
+    super.initState();
+    _loadFolder();
+  }
+
+  Future<void> _loadFolder() async {
+    final f = await FileSaver.folderLabel();
+    if (mounted) setState(() => _folder = f);
+  }
+
+  Future<void> _pickFolder() async {
+    final f = await FileSaver.pickFolder();
+    if (f != null && mounted) setState(() => _folder = f);
+  }
+
+  Future<void> _resetFolder() async {
+    await FileSaver.resetFolder();
+    await _loadFolder();
+  }
 
   Widget _header(BuildContext c, String t) => Padding(
         padding: const EdgeInsets.fromLTRB(16, 20, 16, 4),
@@ -126,6 +157,12 @@ class SettingsPage extends StatelessWidget {
               value: settings.haptic,
               onChanged: settings.setHaptic,
             ),
+            SwitchListTile(
+              title: const Text('Kunci zoom'),
+              subtitle: const Text('Matikan agar bisa cubit zoom in / out'),
+              value: settings.zoomLock,
+              onChanged: settings.setZoomLock,
+            ),
             ListTile(
               title: const Text('Ukuran teks'),
               subtitle: Slider(
@@ -147,8 +184,19 @@ class SettingsPage extends StatelessWidget {
             ),
             _header(context, 'Data'),
             ListTile(
+              leading: const Icon(Icons.folder_rounded),
+              title: const Text('Folder simpan'),
+              subtitle: Text(_folder),
+              onTap: _pickFolder,
+              trailing: IconButton(
+                tooltip: 'Kembali ke default',
+                icon: const Icon(Icons.restart_alt_rounded),
+                onPressed: _resetFolder,
+              ),
+            ),
+            ListTile(
               leading: const Icon(Icons.folder_open_rounded),
-              title: const Text('Folder unduhan'),
+              title: const Text('Buka folder unduhan'),
               onTap: FileSaver.openDownloads,
             ),
             ListTile(

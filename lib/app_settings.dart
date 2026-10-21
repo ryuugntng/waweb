@@ -1,11 +1,11 @@
 import 'package:flutter/foundation.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+
+import 'file_saver.dart';
 
 class AppSettings extends ChangeNotifier {
-  SharedPreferences? _p;
-
   String lang = 'id';
   int zoom = 100;
+  bool zoomLock = true; // true = pinch zoom dikunci
   bool pillRight = true;
   bool fullscreen = false;
   bool haptic = true;
@@ -13,56 +13,37 @@ class AppSettings extends ChangeNotifier {
   bool? waDark;
 
   Future<void> load() async {
-    final p = await SharedPreferences.getInstance();
-    _p = p;
-    lang = p.getString('lang') ?? lang;
-    zoom = p.getInt('zoom') ?? zoom;
-    pillRight = p.getBool('pillRight') ?? pillRight;
-    fullscreen = p.getBool('fullscreen') ?? fullscreen;
-    haptic = p.getBool('haptic') ?? haptic;
-    pillY = p.getDouble('pillY') ?? pillY;
-    waDark = p.getBool('waDark');
+    final p = await Native.prefs();
+    lang = p['lang'] as String? ?? lang;
+    zoom = p['zoom'] as int? ?? zoom;
+    zoomLock = p['zoomLock'] as bool? ?? zoomLock;
+    pillRight = p['pillRight'] as bool? ?? pillRight;
+    fullscreen = p['fullscreen'] as bool? ?? fullscreen;
+    haptic = p['haptic'] as bool? ?? haptic;
+    pillY = double.tryParse(p['pillY']?.toString() ?? '') ?? pillY;
+    waDark = p['waDark'] as bool?;
   }
 
-  void setLang(String v) {
-    lang = v;
-    _p?.setString('lang', v);
+  void _set(VoidCallback f, String k, Object v) {
+    f();
+    Native.setPref(k, v);
     notifyListeners();
   }
+
+  void setLang(String v) => _set(() => lang = v, 'lang', v);
 
   void setZoom(int v) {
-    zoom = v.clamp(70, 160);
-    _p?.setInt('zoom', zoom);
-    notifyListeners();
+    final z = v.clamp(70, 160);
+    _set(() => zoom = z, 'zoom', z);
   }
 
-  void setPillRight(bool v) {
-    pillRight = v;
-    _p?.setBool('pillRight', v);
-    notifyListeners();
-  }
+  void setZoomLock(bool v) => _set(() => zoomLock = v, 'zoomLock', v);
+  void setPillRight(bool v) => _set(() => pillRight = v, 'pillRight', v);
+  void setFullscreen(bool v) => _set(() => fullscreen = v, 'fullscreen', v);
+  void setHaptic(bool v) => _set(() => haptic = v, 'haptic', v);
 
-  void setFullscreen(bool v) {
-    fullscreen = v;
-    _p?.setBool('fullscreen', v);
-    notifyListeners();
-  }
+  // pillY disimpan sebagai string (di-parse lagi saat load)
+  void setPillY(double v) => _set(() => pillY = v, 'pillY', v.toString());
 
-  void setHaptic(bool v) {
-    haptic = v;
-    _p?.setBool('haptic', v);
-    notifyListeners();
-  }
-
-  void setPillY(double v) {
-    pillY = v;
-    _p?.setDouble('pillY', v);
-    notifyListeners();
-  }
-
-  void setWaDark(bool v) {
-    waDark = v;
-    _p?.setBool('waDark', v);
-    notifyListeners();
-  }
+  void setWaDark(bool v) => _set(() => waDark = v, 'waDark', v);
 }

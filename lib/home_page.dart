@@ -1,13 +1,9 @@
-import 'dart:async';
 import 'dart:collection';
 import 'dart:convert';
 
-import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
-import 'package:permission_handler/permission_handler.dart' as ph;
-import 'package:url_launcher/url_launcher.dart';
 
 import 'app_settings.dart';
 import 'file_saver.dart';
@@ -130,23 +126,23 @@ class HomePage extends StatefulWidget {
   State<HomePage> createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage> {
+class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   static const _url = 'https://web.whatsapp.com/';
   static const _ua =
       'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) '
       'Chrome/131.0.0.0 Safari/537.36';
 
   InAppWebViewController? _c;
-  StreamSubscription<List<ConnectivityResult>>? _sub;
   bool _offline = false;
   bool _failed = false;
   bool _menuOpen = false;
-  int _progress = 0;
+  final ValueNotifier<int> _progress = ValueNotifier<int>(0);
   String _sel = '';
   String _userAgent = _ua;
   bool _uaReady = false;
   double? _dragY;
   int _appliedZoom = 0;
+  bool _appliedLock = true;
   bool? _appliedFs;
   DateTime _lastBack = DateTime.fromMillisecondsSinceEpoch(0);
 
@@ -156,19 +152,26 @@ class _HomePageState extends State<HomePage> {
   void initState() {
     super.initState();
     _appliedZoom = s.zoom;
+    _appliedLock = s.zoomLock;
     s.addListener(_onSettings);
+    WidgetsBinding.instance.addObserver(this);
     _applyFullscreen();
     _initUa();
-    _sub = Connectivity().onConnectivityChanged.listen((_) => _check());
     _check();
   }
 
   @override
   void dispose() {
     s.removeListener(_onSettings);
-    _sub?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
+    _progress.dispose();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _check();
   }
 
   Future<void> _initUa() async {
@@ -193,8 +196,10 @@ class _HomePageState extends State<HomePage> {
   }
 
   void _onSettings() {
-    if (_c != null && _appliedZoom != s.zoom) {
+    if (_c != null &&
+        (_appliedZoom != s.zoom || _appliedLock != s.zoomLock)) {
       _appliedZoom = s.zoom;
+      _appliedLock = s.zoomLock;
       _c!.setSettings(settings: _webSettings());
     }
     _applyFullscreen();
@@ -212,8 +217,8 @@ class _HomePageState extends State<HomePage> {
         allowsInlineMediaPlayback: true,
         useWideViewPort: false,
         loadWithOverviewMode: false,
-        supportZoom: false,
-        builtInZoomControls: false,
+        supportZoom: !s.zoomLock,
+        builtInZoomControls: !s.zoomLock,
         displayZoomControls: false,
         textZoom: s.zoom,
         useOnDownloadStart: true,
@@ -232,7 +237,7 @@ class _HomePageState extends State<HomePage> {
   Future<void> _check() async {
     final ok = await hasInternet();
     if (!mounted) return;
-    setState(() => _offline = !ok);
+    if (_offline != !ok) setState(() => _offline = !ok);
     if (ok && _failed) {
       setState(() => _failed = false);
       _load();
@@ -259,7 +264,7 @@ class _HomePageState extends State<HomePage> {
       h.endsWith('.whatsapp.net');
 
   void _external(WebUri u) {
-    launchUrl(Uri.parse(u.toString()), mode: LaunchMode.externalApplication);
+    Native.launch(u.toString());
   }
 
   void _toast(String msg, {String? label, VoidCallback? onTap}) {
@@ -317,22 +322,18 @@ class _HomePageState extends State<HomePage> {
 
   Future<PermissionResponse> _onPermission(
       InAppWebViewController c, PermissionRequest r) async {
-    final need = <ph.Permission>{};
+    final need = <String>{};
     for (final res in r.resources) {
       if (res == PermissionResourceType.CAMERA ||
           res == PermissionResourceType.CAMERA_AND_MICROPHONE) {
-        need.add(ph.Permission.camera);
+        need.add('android.permission.CAMERA');
       }
       if (res == PermissionResourceType.MICROPHONE ||
           res == PermissionResourceType.CAMERA_AND_MICROPHONE) {
-        need.add(ph.Permission.microphone);
+        need.add('android.permission.RECORD_AUDIO');
       }
     }
-    var ok = true;
-    if (need.isNotEmpty) {
-      final st = await need.toList().request();
-      ok = st.values.every((e) => e.isGranted);
-    }
+    final ok = need.isEmpty ? true : await Native.perms(need.toList());
     return PermissionResponse(
       resources: r.resources,
       action: ok ? PermissionResponseAction.GRANT : PermissionResponseAction.DENY,
@@ -345,6 +346,7 @@ class _HomePageState extends State<HomePage> {
     await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      useSafeArea: true,
       showDragHandle: true,
       builder: (_) => TranslateSheet(
         initial: sel,
@@ -420,15 +422,18 @@ class _HomePageState extends State<HomePage> {
                 Positioned.fill(
                   child: Column(
                     children: [
-                      SizedBox(
-                        height: 2,
-                        child: _progress < 100
-                            ? LinearProgressIndicator(
-                                value: _progress / 100,
-                                minHeight: 2,
-                                backgroundColor: Colors.transparent,
-                              )
-                            : null,
+                      ValueListenableBuilder<int>(
+                        valueListenable: _progress,
+                        builder: (_, p, __) => SizedBox(
+                          height: 2,
+                          child: p < 100
+                              ? LinearProgressIndicator(
+                                  value: p / 100,
+                                  minHeight: 2,
+                                  backgroundColor: Colors.transparent,
+                                )
+                              : null,
+                        ),
                       ),
                       Expanded(
                         child: InAppWebView(
@@ -480,8 +485,7 @@ class _HomePageState extends State<HomePage> {
                           onLoadStart: (c, u) {
                             if (_failed) setState(() => _failed = false);
                           },
-                          onProgressChanged: (c, p) =>
-                              setState(() => _progress = p),
+                          onProgressChanged: (c, p) => _progress.value = p,
                           onReceivedError: (c, req, err) async {
                             if (!(req.isForMainFrame ?? false)) return;
                             final t = err.type;
@@ -660,6 +664,16 @@ class _HomePageState extends State<HomePage> {
                       ),
                     ],
                   ),
+                ),
+                item(
+                  s.zoomLock ? Icons.lock_rounded : Icons.lock_open_rounded,
+                  s.zoomLock ? 'Zoom jari: terkunci' : 'Zoom jari: terbuka',
+                  () {
+                    s.setZoomLock(!s.zoomLock);
+                    _toast(s.zoomLock
+                        ? 'Zoom dikunci'
+                        : 'Cubit layar untuk zoom in / out');
+                  },
                 ),
                 item(
                   s.fullscreen

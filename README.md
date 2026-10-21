@@ -11,6 +11,8 @@ Author: aether · Versi: BETA
    atau buka tab Actions, pilih Build and Release, lalu Run workflow.
 3. APK muncul di halaman Releases.
 
+Dependensi hanya `flutter_inappwebview`; sisanya (izin, prefs, folder, koneksi) lewat Kotlin di `MainActivity.kt`.
+
 Folder `android/` dibuat otomatis oleh workflow dari `android_overlay/`.
 
 ## Jalan lokal
