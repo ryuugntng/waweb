@@ -109,6 +109,45 @@ const _wipeJs = r'''
 })();
 ''';
 
+// Viewport dinamis: lebar layout W (desktop = 980) dan skala pas layar.
+// {{W}} dan {{L}} diisi dari Dart.
+const _viewJs = r'''
+(function () {
+  var W = {{W}}, L = {{L}}, forced = false;
+  function content() {
+    var sw = Math.max(screen.width || 360, 200);
+    var s = Math.max(0.05, Math.min(5, sw / W));
+    return 'width=' + W + ', initial-scale=' + s.toFixed(4) +
+      ', minimum-scale=0.05, maximum-scale=5, user-scalable=' + (L ? 'no' : 'yes');
+  }
+  function apply() {
+    var h = document.head || document.documentElement;
+    if (!h) return;
+    var m = document.querySelector('meta[name=viewport]');
+    if (!m) { m = document.createElement('meta'); m.name = 'viewport'; h.appendChild(m); }
+    var c = forced ? 'width=' + (W + 1) : content();
+    if (m.getAttribute('content') !== c) m.setAttribute('content', c);
+  }
+  window.__wawebView = function (w, l, force) {
+    W = w; L = l;
+    if (force) {
+      forced = true; apply();
+      setTimeout(function () { forced = false; apply(); }, 80);
+    } else { apply(); }
+  };
+  apply();
+  document.addEventListener('DOMContentLoaded', apply);
+  window.addEventListener('orientationchange', function () { setTimeout(apply, 200); });
+  try {
+    var mo = new MutationObserver(apply);
+    mo.observe(document.documentElement, { childList: true });
+    var t = setInterval(function () {
+      if (document.head) { mo.observe(document.head, { childList: true }); clearInterval(t); }
+    }, 50);
+  } catch (e) {}
+})();
+''';
+
 const _escJs = r'''
 (function () {
   var t = document.activeElement || document.body;
@@ -201,9 +240,23 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       _appliedZoom = s.zoom;
       _appliedLock = s.zoomLock;
       _c!.setSettings(settings: _webSettings());
+      _applyView();
     }
     _applyFullscreen();
     if (mounted) setState(() {});
+  }
+
+  void _applyView({bool force = false}) {
+    _c?.evaluateJavascript(
+        source:
+            'window.__wawebView&&window.__wawebView(${viewWidthFor(s.zoom)},${s.zoomLock},$force);');
+  }
+
+  /// Kembali ke tampilan desktop (100%) dan buang zoom cubitan.
+  void _resetView() {
+    if (s.zoom != 100) s.setZoom(100);
+    _applyView(force: true);
+    if (s.haptic) HapticFeedback.selectionClick();
   }
 
   InAppWebViewSettings _webSettings() => InAppWebViewSettings(
@@ -215,12 +268,12 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         thirdPartyCookiesEnabled: true,
         mediaPlaybackRequiresUserGesture: false,
         allowsInlineMediaPlayback: true,
-        useWideViewPort: false,
-        loadWithOverviewMode: false,
+        useWideViewPort: true,
+        loadWithOverviewMode: true,
         supportZoom: !s.zoomLock,
         builtInZoomControls: !s.zoomLock,
         displayZoomControls: false,
-        textZoom: s.zoom,
+        textZoom: 100,
         useOnDownloadStart: true,
         useShouldOverrideUrlLoading: true,
         javaScriptCanOpenWindowsAutomatically: true,
@@ -441,6 +494,13 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                           initialSettings: _webSettings(),
                           initialUserScripts: UnmodifiableListView<UserScript>([
                             UserScript(
+                              source: _viewJs
+                                  .replaceFirst('{{W}}', '${viewWidthFor(s.zoom)}')
+                                  .replaceFirst('{{L}}', '${s.zoomLock}'),
+                              injectionTime:
+                                  UserScriptInjectionTime.AT_DOCUMENT_START,
+                            ),
+                            UserScript(
                               source: _bootJs,
                               injectionTime:
                                   UserScriptInjectionTime.AT_DOCUMENT_START,
@@ -652,19 +712,23 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                   child: Row(
                     children: [
                       IconButton(
-                        icon: const Icon(Icons.text_decrease_rounded, size: 22),
-                        onPressed: () => s.setZoom(s.zoom - 10),
+                        tooltip: 'Kecilkan web',
+                        icon: const Icon(Icons.zoom_out_rounded, size: 24),
+                        onPressed: () => s.zoomOut(),
                       ),
                       Expanded(
-                        child: Center(child: Text('Teks ${s.zoom}%')),
+                        child: Center(child: Text('Web ${s.zoom}%')),
                       ),
                       IconButton(
-                        icon: const Icon(Icons.text_increase_rounded, size: 22),
-                        onPressed: () => s.setZoom(s.zoom + 10),
+                        tooltip: 'Besarkan web',
+                        icon: const Icon(Icons.zoom_in_rounded, size: 24),
+                        onPressed: () => s.zoomIn(),
                       ),
                     ],
                   ),
                 ),
+                item(Icons.desktop_windows_rounded, 'Reset ke tampilan desktop',
+                    _resetView),
                 item(
                   s.zoomLock ? Icons.lock_rounded : Icons.lock_open_rounded,
                   s.zoomLock ? 'Zoom jari: terkunci' : 'Zoom jari: terbuka',

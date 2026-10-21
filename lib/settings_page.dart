@@ -164,16 +164,24 @@ class _SettingsPageState extends State<SettingsPage> {
               onChanged: settings.setZoomLock,
             ),
             ListTile(
-              title: const Text('Ukuran teks'),
+              title: const Text('Zoom web'),
               subtitle: Slider(
-                min: 70,
-                max: 160,
-                divisions: 9,
+                min: 0,
+                max: (kZoomSteps.length - 1).toDouble(),
+                divisions: kZoomSteps.length - 1,
                 label: '${settings.zoom}%',
-                value: settings.zoom.toDouble(),
-                onChanged: (v) => settings.setZoom(v.round()),
+                value: kZoomSteps
+                    .indexOf(kZoomSteps.reduce((x, y) =>
+                        (x - settings.zoom).abs() <= (y - settings.zoom).abs()
+                            ? x
+                            : y))
+                    .toDouble(),
+                onChanged: (v) => settings.setZoom(kZoomSteps[v.round()]),
               ),
-              trailing: Text('${settings.zoom}%'),
+              trailing: TextButton(
+                onPressed: () => settings.setZoom(100),
+                child: Text('${settings.zoom}% · Reset'),
+              ),
             ),
             _header(context, 'Terjemahan'),
             ListTile(
