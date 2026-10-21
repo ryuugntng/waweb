@@ -98,6 +98,21 @@ const _bootJs = r'''
 })();
 ''';
 
+const _wipeJs = r'''
+(async function () {
+  try {
+    localStorage.clear();
+    sessionStorage.clear();
+    var d = await indexedDB.databases();
+    for (var i = 0; i < d.length; i++) { indexedDB.deleteDatabase(d[i].name); }
+    var k = await caches.keys();
+    for (var j = 0; j < k.length; j++) { await caches.delete(k[j]); }
+    var r = await navigator.serviceWorker.getRegistrations();
+    for (var x = 0; x < r.length; x++) { await r[x].unregister(); }
+  } catch (e) {}
+})();
+''';
+
 const _escJs = r'''
 (function () {
   var t = document.activeElement || document.body;
@@ -329,7 +344,8 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _clearData() async {
     await CookieManager.instance().deleteAllCookies();
-    await WebStorage.instance().deleteAllData();
+    await _c?.evaluateJavascript(source: _wipeJs);
+    await Future.delayed(const Duration(seconds: 1));
     await InAppWebViewController.clearAllCache();
     _load();
   }
