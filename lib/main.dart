@@ -9,7 +9,9 @@ import 'home_page.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   final settings = AppSettings();
-  await settings.load();
+  try {
+    await settings.load().timeout(const Duration(seconds: 3));
+  } catch (_) {}
   runApp(WaWebApp(settings: settings));
 }
 

@@ -143,6 +143,8 @@ class _HomePageState extends State<HomePage> {
   bool _menuOpen = false;
   int _progress = 0;
   String _sel = '';
+  String _userAgent = _ua;
+  bool _uaReady = false;
   double? _dragY;
   int _appliedZoom = 0;
   bool? _appliedFs;
@@ -156,6 +158,7 @@ class _HomePageState extends State<HomePage> {
     _appliedZoom = s.zoom;
     s.addListener(_onSettings);
     _applyFullscreen();
+    _initUa();
     _sub = Connectivity().onConnectivityChanged.listen((_) => _check());
     _check();
   }
@@ -166,6 +169,19 @@ class _HomePageState extends State<HomePage> {
     _sub?.cancel();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     super.dispose();
+  }
+
+  Future<void> _initUa() async {
+    try {
+      final d = await InAppWebViewController.getDefaultUserAgent()
+          .timeout(const Duration(seconds: 3));
+      final u = d
+          .replaceAll(RegExp(r'\(Linux; Android[^)]*\)'), '(X11; Linux x86_64)')
+          .replaceAll(RegExp(r' Version/[\d.]+'), '')
+          .replaceAll(' Mobile', '');
+      if (u.contains('Chrome/')) _userAgent = u;
+    } catch (_) {}
+    if (mounted) setState(() => _uaReady = true);
   }
 
   void _applyFullscreen() {
@@ -186,7 +202,7 @@ class _HomePageState extends State<HomePage> {
   }
 
   InAppWebViewSettings _webSettings() => InAppWebViewSettings(
-        userAgent: _ua,
+        userAgent: _userAgent,
         javaScriptEnabled: true,
         domStorageEnabled: true,
         databaseEnabled: true,
@@ -369,6 +385,12 @@ class _HomePageState extends State<HomePage> {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final showOffline = _offline || _failed;
+    if (!_uaReady) {
+      return Scaffold(
+        backgroundColor: cs.surface,
+        body: const Center(child: CircularProgressIndicator()),
+      );
+    }
 
     return PopScope(
       canPop: false,

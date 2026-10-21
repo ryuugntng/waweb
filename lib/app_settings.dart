@@ -2,7 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class AppSettings extends ChangeNotifier {
-  late final SharedPreferences _p;
+  SharedPreferences? _p;
 
   String lang = 'id';
   int zoom = 100;
@@ -13,55 +13,56 @@ class AppSettings extends ChangeNotifier {
   bool? waDark;
 
   Future<void> load() async {
-    _p = await SharedPreferences.getInstance();
-    lang = _p.getString('lang') ?? lang;
-    zoom = _p.getInt('zoom') ?? zoom;
-    pillRight = _p.getBool('pillRight') ?? pillRight;
-    fullscreen = _p.getBool('fullscreen') ?? fullscreen;
-    haptic = _p.getBool('haptic') ?? haptic;
-    pillY = _p.getDouble('pillY') ?? pillY;
-    waDark = _p.getBool('waDark');
+    final p = await SharedPreferences.getInstance();
+    _p = p;
+    lang = p.getString('lang') ?? lang;
+    zoom = p.getInt('zoom') ?? zoom;
+    pillRight = p.getBool('pillRight') ?? pillRight;
+    fullscreen = p.getBool('fullscreen') ?? fullscreen;
+    haptic = p.getBool('haptic') ?? haptic;
+    pillY = p.getDouble('pillY') ?? pillY;
+    waDark = p.getBool('waDark');
   }
 
   void setLang(String v) {
     lang = v;
-    _p.setString('lang', v);
+    _p?.setString('lang', v);
     notifyListeners();
   }
 
   void setZoom(int v) {
     zoom = v.clamp(70, 160);
-    _p.setInt('zoom', zoom);
+    _p?.setInt('zoom', zoom);
     notifyListeners();
   }
 
   void setPillRight(bool v) {
     pillRight = v;
-    _p.setBool('pillRight', v);
+    _p?.setBool('pillRight', v);
     notifyListeners();
   }
 
   void setFullscreen(bool v) {
     fullscreen = v;
-    _p.setBool('fullscreen', v);
+    _p?.setBool('fullscreen', v);
     notifyListeners();
   }
 
   void setHaptic(bool v) {
     haptic = v;
-    _p.setBool('haptic', v);
+    _p?.setBool('haptic', v);
     notifyListeners();
   }
 
   void setPillY(double v) {
     pillY = v;
-    _p.setDouble('pillY', v);
+    _p?.setDouble('pillY', v);
     notifyListeners();
   }
 
   void setWaDark(bool v) {
     waDark = v;
-    _p.setBool('waDark', v);
+    _p?.setBool('waDark', v);
     notifyListeners();
   }
 }

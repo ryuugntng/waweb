@@ -46,7 +46,7 @@ jobs:
           grep -rl "proguard-android.txt" "$PUB_CACHE/hosted" --include=build.gradle --include=build.gradle.kts 2>/dev/null | xargs -r sed -i "s/proguard-android\\.txt/proguard-android-optimize.txt/g"
 
       - name: Build APK
-        run: flutter build apk --release --split-per-abi
+        run: flutter build apk --release --split-per-abi --no-shrink
 
       - name: Collect APK
         run: |
